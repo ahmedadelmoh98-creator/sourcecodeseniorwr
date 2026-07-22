@@ -1,0 +1,75 @@
+services:
+
+  db01:
+    image: mysql:8.0
+    container_name: db01
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vprodbpass
+      MYSQL_DATABASE: accounts
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./src/main/resources/db_backup.sql:/docker-entrypoint-initdb.d/db_backup.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - vprofile-network
+
+  mc01:
+    image: memcached:1.6
+    container_name: mc01
+    restart: unless-stopped
+    ports:
+      - "11211:11211"
+    networks:
+      - vprofile-network
+
+  rmq01:
+    image: rabbitmq:3-management
+    container_name: rmq01
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - vprofile-network
+
+  vprosearch01:
+    image: elasticsearch:7.17.25
+    container_name: vprosearch01
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      cluster.name: vprofile
+      node.name: vprofilenode
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - vprofile-network
+
+  vprofile-app:
+    image: vprofile-app:v1
+    container_name: vprofile-app
+    restart: unless-stopped
+    depends_on:
+      - db01
+      - mc01
+      - rmq01
+      - vprosearch01
+    ports:
+      - "8080:8080"
+    networks:
+      - vprofile-network
+
+volumes:
+  dbdata:
+
+networks:
+  vprofile-network:
+    driver: bridge
