@@ -1,39 +1,20 @@
-pipeline {
-    agent any
+stages {
 
-    tools {
-        jdk 'JDK17'
-        maven 'Maven3'
+    stage('Checkout Test') {
+        steps {
+            echo 'Jenkins successfully loaded the Jenkinsfile from GitHub'
+        }
     }
 
-    stages {
-        stage('Checkout Test') {
-            steps {
-                echo 'Jenkins successfully loaded the Jenkinsfile from GitHub'
-            }
+    stage('Maven Build') {
+        steps {
+            sh 'mvn clean package -DskipTests'
         }
-
-        stage('Maven Build') {
-            steps {
-                sh 'mvn clean package -DskipTests'
-            }
-        }
-stage('Docker Build') {
-    steps {
-        sh 'docker build -t vprofile-app:latest .'
-    }
-}
-
-
     }
 
-    post {
-        success {
-            echo 'Pipeline completed successfully'
-        }
-
-        failure {
-            echo 'Pipeline failed'
+    stage('Docker Build') {
+        steps {
+            sh 'docker build -t vprofile-app:latest .'
         }
     }
 }
