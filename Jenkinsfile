@@ -27,7 +27,13 @@ pipeline {
 
         stage('Trivy Scan') {
             steps {
-                sh 'trivy image --severity HIGH,CRITICAL --exit-code 0 vprofile-app:latest'
+                sh '''
+                    trivy image \
+                    --timeout 15m \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 0 \
+                    vprofile-app:latest
+                '''
             }
         }
     }
