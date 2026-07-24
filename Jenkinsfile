@@ -6,6 +6,13 @@ pipeline {
         maven 'Maven3'
     }
 
+    environment {
+        AWS_REGION     = 'us-east-1'
+        ECR_REGISTRY   = '506715795182.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_REPOSITORY = 'vprofile-app'
+        LOCAL_IMAGE    = 'vprofile-app:latest'
+    }
+
     stages {
 
         stage('Checkout Test') {
@@ -42,7 +49,9 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t vprofile-app:latest .'
+                sh '''
+                    docker build -t ${LOCAL_IMAGE} .
+                '''
             }
         }
 
@@ -53,7 +62,48 @@ pipeline {
                     --timeout 15m \
                     --severity HIGH,CRITICAL \
                     --exit-code 0 \
-                    vprofile-app:latest
+                    ${LOCAL_IMAGE}
+                '''
+            }
+        }
+
+        stage('Login to Amazon ECR') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-creds']
+                ]) {
+                    sh '''
+                        aws ecr get-login-password \
+                        --region ${AWS_REGION} |
+                        docker login \
+                        --username AWS \
+                        --password-stdin ${ECR_REGISTRY}
+                    '''
+                }
+            }
+        }
+
+        stage('Tag Docker Image') {
+            steps {
+                sh '''
+                    docker tag ${LOCAL_IMAGE} \
+                    ${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}
+
+                    docker tag ${LOCAL_IMAGE} \
+                    ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+                '''
+            }
+        }
+
+        stage('Push Image to Amazon ECR') {
+            steps {
+                sh '''
+                    docker push \
+                    ${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}
+
+                    docker push \
+                    ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
                 '''
             }
         }
@@ -61,7 +111,9 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline completed successfully'
+            echo "Pipeline completed successfully"
+            echo "Image pushed with tag: ${BUILD_NUMBER}"
+            echo "ECR Image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}"
         }
 
         failure {
