@@ -19,6 +19,18 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=vprofile \
+                        -Dsonar.projectName=vprofile
+                    '''
+                }
+            }
+        }
+
         stage('Docker Build') {
             steps {
                 sh 'docker build -t vprofile-app:latest .'
