@@ -7,6 +7,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout Test') {
             steps {
                 echo 'Jenkins successfully loaded the Jenkinsfile from GitHub'
@@ -27,6 +28,14 @@ pipeline {
                         -Dsonar.projectKey=vprofile \
                         -Dsonar.projectName=vprofile
                     '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
