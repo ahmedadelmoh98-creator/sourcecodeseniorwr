@@ -1,0 +1,27 @@
+replicaCount: 2
+
+image:
+  repository: 506715795182.dkr.ecr.us-east-1.amazonaws.com/vprofile-app
+  tag: latest
+  pullPolicy: Always
+
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: alb
+  scheme: internet-facing
+  targetType: ip
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
