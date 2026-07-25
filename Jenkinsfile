@@ -11,6 +11,11 @@ pipeline {
         ECR_REGISTRY   = '506715795182.dkr.ecr.us-east-1.amazonaws.com'
         ECR_REPOSITORY = 'vprofile-app'
         LOCAL_IMAGE    = 'vprofile-app:latest'
+
+        EKS_CLUSTER    = 'vprofile-devops-dev-cluster'
+        K8S_NAMESPACE  = 'vprofile'
+        HELM_RELEASE   = 'vprofile'
+        HELM_CHART     = 'vprofile-chart'
     }
 
     stages {
@@ -107,13 +112,73 @@ pipeline {
                 '''
             }
         }
+
+        stage('Update EKS Kubeconfig') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-creds']
+                ]) {
+                    sh '''
+                        mkdir -p ${WORKSPACE}/.kube
+
+                        aws eks update-kubeconfig \
+                        --region ${AWS_REGION} \
+                        --name ${EKS_CLUSTER} \
+                        --kubeconfig ${WORKSPACE}/.kube/config
+
+                        export KUBECONFIG=${WORKSPACE}/.kube/config
+
+                        kubectl get nodes
+                    '''
+                }
+            }
+        }
+
+        stage('Helm Deploy to EKS') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-creds']
+                ]) {
+                    sh '''
+                        export KUBECONFIG=${WORKSPACE}/.kube/config
+
+                        helm lint ./${HELM_CHART}
+
+                        helm upgrade --install ${HELM_RELEASE} ./${HELM_CHART} \
+                        --namespace ${K8S_NAMESPACE} \
+                        --create-namespace \
+                        --set image.repository=${ECR_REGISTRY}/${ECR_REPOSITORY} \
+                        --set image.tag=${BUILD_NUMBER}
+                    '''
+                }
+            }
+        }
+
+        stage('Verify EKS Deployment') {
+            steps {
+                sh '''
+                    export KUBECONFIG=${WORKSPACE}/.kube/config
+
+                    kubectl rollout status deployment/vprofile \
+                    --namespace ${K8S_NAMESPACE} \
+                    --timeout=300s
+
+                    kubectl get pods -n ${K8S_NAMESPACE}
+                    kubectl get svc -n ${K8S_NAMESPACE}
+                    kubectl get ingress -n ${K8S_NAMESPACE}
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo "Pipeline completed successfully"
+            echo 'Pipeline completed successfully'
             echo "Image pushed with tag: ${BUILD_NUMBER}"
             echo "ECR Image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}"
+            echo "Application deployed to EKS cluster: ${EKS_CLUSTER}"
         }
 
         failure {
