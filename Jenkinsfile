@@ -28,7 +28,9 @@ pipeline {
 
         stage('Maven Build') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh '''
+                    mvn clean package -DskipTests
+                '''
             }
         }
 
@@ -158,17 +160,22 @@ pipeline {
 
         stage('Verify EKS Deployment') {
             steps {
-                sh '''
-                    export KUBECONFIG=${WORKSPACE}/.kube/config
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws-creds']
+                ]) {
+                    sh '''
+                        export KUBECONFIG=${WORKSPACE}/.kube/config
 
-                    kubectl rollout status deployment/vprofile \
-                    --namespace ${K8S_NAMESPACE} \
-                    --timeout=300s
+                        kubectl rollout status deployment/vprofile \
+                        --namespace ${K8S_NAMESPACE} \
+                        --timeout=300s
 
-                    kubectl get pods -n ${K8S_NAMESPACE}
-                    kubectl get svc -n ${K8S_NAMESPACE}
-                    kubectl get ingress -n ${K8S_NAMESPACE}
-                '''
+                        kubectl get pods -n ${K8S_NAMESPACE}
+                        kubectl get svc -n ${K8S_NAMESPACE}
+                        kubectl get ingress -n ${K8S_NAMESPACE}
+                    '''
+                }
             }
         }
     }
